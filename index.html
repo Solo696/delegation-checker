@@ -1,0 +1,1287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EIP-7702 Delegation Scanner</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&family=Orbitron:wght@700;900&display=swap');
+
+  :root {
+    --bg: #050810;
+    --panel: #0a0f1e;
+    --panel2: #0d1525;
+    --border: #1a2a4a;
+    --accent: #00e5ff;
+    --danger: #ff2d55;
+    --warn: #ffa500;
+    --safe: #00ff88;
+    --text: #c8d8f0;
+    --dim: #4a6080;
+    --glow: 0 0 20px rgba(0,229,255,0.3);
+    --glow-danger: 0 0 20px rgba(255,45,85,0.3);
+    --glow-safe: 0 0 20px rgba(0,255,136,0.3);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Animated corner accents */
+  body::after {
+    content: '';
+    position: fixed;
+    top: 0; left: 0;
+    width: 200px; height: 200px;
+    background: radial-gradient(circle at top left, rgba(0,229,255,0.07), transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 40px 20px 60px;
+  }
+
+  /* Header */
+  .header {
+    text-align: center;
+    margin-bottom: 40px;
+    animation: fadeDown 0.7s ease both;
+  }
+
+  .eyebrow {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 4px;
+    color: var(--danger);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .eyebrow::before, .eyebrow::after {
+    content: '';
+    width: 40px; height: 1px;
+    background: var(--danger);
+    opacity: 0.5;
+  }
+
+  h1 {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(22px, 5vw, 44px);
+    font-weight: 900;
+    color: #fff;
+    line-height: 1.1;
+    text-shadow: 0 0 40px rgba(0,229,255,0.4);
+  }
+
+  h1 span { color: var(--accent); }
+
+  .subtitle {
+    margin-top: 12px;
+    font-size: 15px;
+    color: var(--dim);
+    letter-spacing: 0.5px;
+  }
+
+  /* Scanner card */
+  .scanner-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 32px;
+    margin-bottom: 28px;
+    animation: fadeUp 0.7s 0.1s ease both;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .scanner-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0.4;
+  }
+
+  .scanner-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+
+  /* Chain selector */
+  .chain-selector {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  .chain-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--dim);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    padding: 7px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    letter-spacing: 1px;
+  }
+
+  .chain-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .chain-btn.active {
+    background: rgba(0,229,255,0.1);
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: 0 0 10px rgba(0,229,255,0.15);
+  }
+
+  /* Input row */
+  .input-row {
+    display: flex;
+    gap: 12px;
+    align-items: stretch;
+  }
+
+  .address-input {
+    flex: 1;
+    background: #020408;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    padding: 14px 16px;
+    outline: none;
+    transition: border-color 0.3s, box-shadow 0.3s;
+    min-width: 0;
+  }
+
+  .address-input::placeholder { color: var(--dim); }
+
+  .address-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(0,229,255,0.1);
+  }
+
+  .scan-btn {
+    background: var(--accent);
+    border: none;
+    border-radius: 8px;
+    color: #000;
+    font-family: 'Orbitron', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 14px 24px;
+    cursor: pointer;
+    letter-spacing: 2px;
+    transition: all 0.2s;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .scan-btn:hover {
+    background: #fff;
+    box-shadow: var(--glow);
+  }
+
+  .scan-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* Multi-scan toggle */
+  .multi-toggle {
+    margin-top: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    width: fit-content;
+  }
+
+  .multi-toggle input { display: none; }
+
+  .toggle-track {
+    width: 36px; height: 20px;
+    background: var(--border);
+    border-radius: 10px;
+    position: relative;
+    transition: background 0.3s;
+    flex-shrink: 0;
+  }
+
+  .toggle-thumb {
+    width: 14px; height: 14px;
+    background: var(--dim);
+    border-radius: 50%;
+    position: absolute;
+    top: 3px; left: 3px;
+    transition: all 0.3s;
+  }
+
+  .multi-toggle input:checked ~ .toggle-track { background: rgba(0,229,255,0.2); border: 1px solid var(--accent); }
+  .multi-toggle input:checked ~ .toggle-track .toggle-thumb { left: 19px; background: var(--accent); }
+
+  .toggle-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--dim);
+    letter-spacing: 2px;
+  }
+
+  /* Multi address input */
+  .multi-input {
+    margin-top: 14px;
+    display: none;
+  }
+
+  .multi-input.visible { display: block; }
+
+  .multi-input textarea {
+    width: 100%;
+    background: #020408;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    padding: 14px 16px;
+    outline: none;
+    resize: vertical;
+    min-height: 100px;
+    line-height: 1.8;
+    transition: border-color 0.3s;
+  }
+
+  .multi-input textarea::placeholder { color: var(--dim); }
+  .multi-input textarea:focus { border-color: var(--accent); }
+
+  .multi-input .hint {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--dim);
+    margin-top: 6px;
+    letter-spacing: 1px;
+  }
+
+  /* Results */
+  .results-area {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 28px;
+    min-height: 0;
+  }
+
+  .result-card {
+    background: var(--panel);
+    border-radius: 10px;
+    padding: 20px 24px;
+    animation: fadeUp 0.4s ease both;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .result-card.safe {
+    border: 1px solid rgba(0,255,136,0.3);
+    background: rgba(0,255,136,0.04);
+  }
+
+  .result-card.delegated {
+    border: 1px solid rgba(255,45,85,0.4);
+    background: rgba(255,45,85,0.06);
+  }
+
+  .result-card.loading {
+    border: 1px solid var(--border);
+  }
+
+  .result-card.error {
+    border: 1px solid rgba(255,165,0,0.3);
+    background: rgba(255,165,0,0.04);
+  }
+
+  .result-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+
+  .status-icon {
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+
+  .result-address {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    color: var(--text);
+    word-break: break-all;
+    flex: 1;
+  }
+
+  .result-badge {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    letter-spacing: 2px;
+    flex-shrink: 0;
+  }
+
+  .badge-safe { background: rgba(0,255,136,0.15); color: var(--safe); border: 1px solid rgba(0,255,136,0.3); }
+  .badge-danger { background: rgba(255,45,85,0.15); color: var(--danger); border: 1px solid rgba(255,45,85,0.3); }
+  .badge-warn { background: rgba(255,165,0,0.15); color: var(--warn); border: 1px solid rgba(255,165,0,0.3); }
+
+  .result-detail {
+    font-size: 13px;
+    line-height: 1.6;
+    padding-left: 34px;
+  }
+
+  .result-detail .detail-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--dim);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+  }
+
+  .result-detail .delegate-addr {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    color: var(--danger);
+    word-break: break-all;
+    padding: 8px 12px;
+    background: rgba(255,45,85,0.08);
+    border-radius: 6px;
+    border: 1px solid rgba(255,45,85,0.2);
+    margin-bottom: 10px;
+  }
+
+  .result-detail .action-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .action-link {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    padding: 6px 14px;
+    border-radius: 5px;
+    text-decoration: none;
+    letter-spacing: 1px;
+    transition: all 0.2s;
+    cursor: pointer;
+    border: none;
+    background: rgba(255,45,85,0.12);
+    color: var(--danger);
+    border: 1px solid rgba(255,45,85,0.25);
+  }
+
+  .action-link:hover {
+    background: rgba(255,45,85,0.25);
+  }
+
+  .action-link.neutral {
+    background: rgba(0,229,255,0.08);
+    color: var(--accent);
+    border-color: rgba(0,229,255,0.2);
+  }
+
+  .action-link.neutral:hover {
+    background: rgba(0,229,255,0.15);
+  }
+
+  /* Scan line animation */
+  .scanning-bar {
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    border-radius: 2px;
+    animation: scanLine 1.2s ease infinite;
+  }
+
+  @keyframes scanLine {
+    0% { transform: translateX(-100%); opacity: 0; }
+    50% { opacity: 1; }
+    100% { transform: translateX(200%); opacity: 0; }
+  }
+
+  .scanning-text {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    color: var(--accent);
+    letter-spacing: 2px;
+    padding: 4px 0;
+    animation: blink 1s step-end infinite;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* Summary bar */
+  .summary-bar {
+    display: none;
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 20px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 20px;
+    animation: fadeUp 0.4s ease both;
+  }
+
+  .summary-bar.visible { display: flex; }
+
+  .summary-stat { text-align: center; }
+
+  .summary-stat .num {
+    font-family: 'Orbitron', monospace;
+    font-size: 22px;
+    font-weight: 700;
+    display: block;
+  }
+
+  .summary-stat .lbl {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--dim);
+    text-transform: uppercase;
+  }
+
+  .num-total { color: var(--accent); }
+  .num-safe { color: var(--safe); }
+  .num-danger { color: var(--danger); }
+
+  /* Info section */
+  .info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 14px;
+    margin-bottom: 28px;
+    animation: fadeUp 0.7s 0.3s ease both;
+  }
+
+  .info-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+    transition: border-color 0.3s;
+  }
+
+  .info-card:hover { border-color: var(--accent); }
+
+  .info-card .ic-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 12px;
+    color: var(--accent);
+    margin-bottom: 8px;
+    letter-spacing: 1px;
+  }
+
+  .info-card .ic-body {
+    font-size: 13px;
+    color: var(--dim);
+    line-height: 1.6;
+  }
+
+  .info-card code {
+    font-family: 'Share Tech Mono', monospace;
+    color: var(--warn);
+    font-size: 12px;
+  }
+
+  /* Section label */
+  .section-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, var(--border), transparent);
+  }
+
+  /* Emergency */
+  .emergency {
+    background: linear-gradient(135deg, rgba(255,45,85,0.08), rgba(255,165,0,0.04));
+    border: 1px solid rgba(255,45,85,0.3);
+    border-radius: 10px;
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    animation: fadeUp 0.7s 0.5s ease both;
+  }
+
+  .emergency-text { flex: 1; min-width: 200px; }
+  .emergency-text strong { color: var(--danger); display: block; font-size: 15px; margin-bottom: 4px; }
+  .emergency-text span { font-size: 13px; color: var(--dim); }
+
+  .emergency-link {
+    display: inline-block;
+    background: rgba(255,45,85,0.15);
+    border: 1px solid var(--danger);
+    color: var(--danger);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    padding: 10px 20px;
+    border-radius: 6px;
+    text-decoration: none;
+    letter-spacing: 2px;
+    transition: background 0.2s;
+    white-space: nowrap;
+  }
+
+  .emergency-link:hover { background: rgba(255,45,85,0.28); }
+
+  /* ── How It Works ── */
+  .hiw-section {
+    margin-bottom: 36px;
+    animation: fadeUp 0.7s 0.35s ease both;
+  }
+
+  /* Attack flow */
+  .flow-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin-bottom: 28px;
+    position: relative;
+  }
+
+  .flow-steps::before {
+    content: '';
+    position: absolute;
+    left: 19px;
+    top: 40px;
+    bottom: 40px;
+    width: 1px;
+    background: linear-gradient(180deg, var(--danger), rgba(255,45,85,0.1));
+  }
+
+  .flow-step {
+    display: flex;
+    gap: 18px;
+    align-items: flex-start;
+    padding: 18px 0;
+    position: relative;
+  }
+
+  .flow-num {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 1px solid var(--danger);
+    background: rgba(255,45,85,0.1);
+    color: var(--danger);
+    font-family: 'Orbitron', monospace;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+  }
+
+  .flow-step.scanner-step .flow-num {
+    border-color: var(--accent);
+    background: rgba(0,229,255,0.08);
+    color: var(--accent);
+  }
+
+  .flow-body strong {
+    display: block;
+    font-size: 15px;
+    color: var(--text);
+    margin-bottom: 4px;
+    font-weight: 700;
+  }
+
+  .flow-body p {
+    font-size: 13px;
+    color: var(--dim);
+    line-height: 1.65;
+  }
+
+  .flow-body code {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    color: var(--warn);
+    background: rgba(255,165,0,0.08);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+
+  /* Bytecode anatomy */
+  .bytecode-box {
+    background: #020408;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px;
+    margin-bottom: 28px;
+    overflow-x: auto;
+  }
+
+  .bytecode-visual {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 15px;
+    margin-bottom: 20px;
+    align-items: center;
+  }
+
+  .byte-chunk {
+    padding: 8px 12px;
+    border-radius: 6px;
+    letter-spacing: 2px;
+    font-size: 13px;
+    margin: 4px;
+  }
+
+  .chunk-prefix  { background: rgba(255,45,85,0.12);  color: var(--danger); border: 1px solid rgba(255,45,85,0.25); }
+  .chunk-version { background: rgba(255,165,0,0.1);   color: var(--warn);   border: 1px solid rgba(255,165,0,0.25); }
+  .chunk-addr    { background: rgba(0,229,255,0.08);  color: var(--accent); border: 1px solid rgba(0,229,255,0.2);  }
+
+  .byte-arrow {
+    color: var(--dim);
+    font-size: 18px;
+    margin: 4px 2px;
+    align-self: center;
+  }
+
+  .bytecode-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-top: 4px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--dim);
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  /* Two-col layout for scanner steps */
+  .scanner-flow {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+
+  .scanner-step-card {
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    position: relative;
+    transition: border-color 0.3s;
+  }
+
+  .scanner-step-card:hover { border-color: var(--accent); }
+
+  .ssc-num {
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+  }
+
+  .ssc-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+
+  .ssc-body {
+    font-size: 12px;
+    color: var(--dim);
+    line-height: 1.6;
+  }
+
+  .ssc-body code {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--safe);
+  }
+
+  /* Footer */
+  .footer {
+    text-align: center;
+    margin-top: 48px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--dim);
+    letter-spacing: 2px;
+    line-height: 2;
+  }
+
+  /* Animations */
+  @keyframes fadeDown {
+    from { opacity: 0; transform: translateY(-16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Responsive */
+  @media (max-width: 520px) {
+    .input-row { flex-direction: column; }
+    .scan-btn { width: 100%; }
+    .scanner-card { padding: 20px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="eyebrow">⚠ EIP-7702 // SECURITY TOOL</div>
+    <h1>DELEGATION<br><span>SCANNER</span></h1>
+    <div class="subtitle">Check if your Ethereum wallet has been silently delegated</div>
+  </div>
+
+  <!-- Scanner Card -->
+  <div class="scanner-card">
+    <div class="scanner-label">// Select Network</div>
+    <div class="chain-selector" id="chainSelector">
+      <button class="chain-btn active" data-rpc="https://eth.llamarpc.com" data-name="ETH Mainnet" onclick="selectChain(this)">⟠ ETH Mainnet</button>
+      <button class="chain-btn" data-rpc="https://base.llamarpc.com" data-name="Base" onclick="selectChain(this)">🔵 Base</button>
+      <button class="chain-btn" data-rpc="https://arbitrum.llamarpc.com" data-name="Arbitrum" onclick="selectChain(this)">🔷 Arbitrum</button>
+      <button class="chain-btn" data-rpc="https://optimism.llamarpc.com" data-name="Optimism" onclick="selectChain(this)">🔴 Optimism</button>
+    </div>
+
+    <div class="scanner-label">// Wallet Address</div>
+    <div class="input-row">
+      <input
+        class="address-input"
+        id="addressInput"
+        type="text"
+        placeholder="0x..."
+        autocomplete="off"
+        autocorrect="off"
+        spellcheck="false"
+      />
+      <button class="scan-btn" id="scanBtn" onclick="runScan()">SCAN</button>
+    </div>
+
+    <!-- Multi-scan toggle -->
+    <label class="multi-toggle" onclick="toggleMulti()">
+      <input type="checkbox" id="multiCheck">
+      <div class="toggle-track"><div class="toggle-thumb"></div></div>
+      <span class="toggle-label">SCAN MULTIPLE ADDRESSES</span>
+    </label>
+
+    <div class="multi-input" id="multiInput">
+      <textarea id="multiAddresses" placeholder="0xAddress1&#10;0xAddress2&#10;0xAddress3&#10;(one per line, up to 10)"></textarea>
+      <div class="hint">// PASTE ONE ADDRESS PER LINE — MAX 10</div>
+    </div>
+  </div>
+
+  <!-- Summary bar (multi-scan) -->
+  <div class="summary-bar" id="summaryBar">
+    <div class="summary-stat">
+      <span class="num num-total" id="statTotal">0</span>
+      <span class="lbl">Scanned</span>
+    </div>
+    <div class="summary-stat">
+      <span class="num num-safe" id="statSafe">0</span>
+      <span class="lbl">Safe</span>
+    </div>
+    <div class="summary-stat">
+      <span class="num num-danger" id="statDanger">0</span>
+      <span class="lbl">Delegated</span>
+    </div>
+    <div class="summary-stat">
+      <span class="num" style="color:var(--warn)" id="statError">0</span>
+      <span class="lbl">Errors</span>
+    </div>
+  </div>
+
+  <!-- Results area -->
+  <div class="results-area" id="resultsArea"></div>
+
+  <!-- Info Cards -->
+  <div class="section-label">// What is wallet delegation?</div>
+  <div class="info-grid">
+    <div class="info-card">
+      <div class="ic-title">🔑 What Is Delegation?</div>
+      <div class="ic-body">Think of your wallet like a house. Delegation is like handing a stranger a master key — they can now enter, take your stuff, and even change the locks so you can't get back in. You might have handed them that key without even realising it.</div>
+    </div>
+    <div class="info-card">
+      <div class="ic-title">🚨 How You Get Hacked</div>
+      <div class="ic-body">Scammers create fake websites that look real — like a popular crypto app or airdrop page. When you click "Sign" on what looks like a harmless login request, you're actually handing them control of your wallet. No password, no gas fee needed on your end.</div>
+    </div>
+    <div class="info-card">
+      <div class="ic-title">🩹 How to Remove It</div>
+      <div class="ic-body">If your wallet is flagged here, open <strong style="color:var(--accent)">Ambire</strong> or <strong style="color:var(--accent)">Frame wallet</strong> and look for a "clear delegation" option. Act fast — do not send or approve anything until it's cleared. If you're stuck, contact SEAL 911 below.</div>
+    </div>
+    <div class="info-card">
+      <div class="ic-title">🛡️ How to Stay Safe</div>
+      <div class="ic-body">Never click "Sign" on popups from sites you don't fully trust. If a site asks you to sign something to "verify your wallet" or "claim your airdrop" — that's a red flag. When in doubt, close the tab and check the official site URL first.</div>
+    </div>
+  </div>
+
+  <!-- How It Works -->
+  <div class="hiw-section">
+
+    <!-- Attack Flow -->
+    <div class="section-label">// How the scam happens — step by step</div>
+    <div class="flow-steps" style="margin-bottom: 32px;">
+
+      <div class="flow-step">
+        <div class="flow-num">1</div>
+        <div class="flow-body">
+          <strong>You land on a fake website</strong>
+          <p>Scammers build websites that look identical to real crypto apps — a popular DEX, an NFT drop, a token airdrop page. The logo is right, the design looks polished. You'd never know it's fake just by looking.</p>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-num">2</div>
+        <div class="flow-body">
+          <strong>A popup asks you to "sign" something</strong>
+          <p>Your wallet pops up and asks you to sign a message. It might say "Verify your wallet", "Claim your reward", or "Connect to continue." It looks exactly like the harmless login prompts you sign all the time — and it costs you no gas fee, so nothing feels off.</p>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-num">3</div>
+        <div class="flow-body">
+          <strong>That signature is actually handing over your wallet</strong>
+          <p>Hidden in that "harmless" signature is a secret instruction that gives the scammer full control of your wallet. You can't see it in plain text — it's buried in data your wallet doesn't warn you about yet.</p>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-num">4</div>
+        <div class="flow-body">
+          <strong>The scammer drains you — without needing anything else from you</strong>
+          <p>The scammer takes your signature and uses it themselves. Your wallet now obeys their commands. They can drain your tokens, steal your NFTs, or block you from using your own wallet — all without you doing anything else.</p>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-num">5</div>
+        <div class="flow-body">
+          <strong>You try to fix it — but you're locked out</strong>
+          <p>When you realise something's wrong and try to take back control, the scammer's code fights back. It blocks your attempts, or the scammer just re-locks your wallet faster than you can free it. This is why acting immediately matters.</p>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Bytecode Anatomy -->
+    <div class="section-label">// What a hacked wallet looks like vs a safe one</div>
+    <div class="bytecode-box">
+      <div style="font-family:'Share Tech Mono',monospace; font-size:11px; color:var(--dim); letter-spacing:2px; margin-bottom:14px;">🔴 COMPROMISED WALLET — HAS HIDDEN CODE ATTACHED</div>
+      <div class="bytecode-visual">
+        <span class="byte-chunk chunk-prefix">0xEF</span>
+        <span class="byte-arrow">+</span>
+        <span class="byte-chunk chunk-version">01 00</span>
+        <span class="byte-arrow">+</span>
+        <span class="byte-chunk chunk-addr">d8dA6BF26964aF9D7eEd9e03E53415D37aA96045</span>
+      </div>
+      <div class="bytecode-legend">
+        <div class="legend-item">
+          <div class="legend-dot" style="background:var(--danger);"></div>
+          <span><span style="color:var(--danger)">0xEF</span> — A special marker that means "this wallet is under someone else's control."</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:var(--warn);"></div>
+          <span><span style="color:var(--warn)">0100</span> — Identifies this as an EIP-7702 delegation (the type of takeover).</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:var(--accent);"></div>
+          <span><span style="color:var(--accent)">Long address</span> — The scammer's contract address. This is who now controls your wallet.</span>
+        </div>
+      </div>
+      <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border);">
+        <div style="font-family:'Share Tech Mono',monospace; font-size:11px; color:var(--dim); letter-spacing:2px; margin-bottom:10px;">🟢 SAFE WALLET — NOTHING ATTACHED</div>
+        <span class="byte-chunk" style="background:rgba(0,255,136,0.08); color:var(--safe); border:1px solid rgba(0,255,136,0.2);">0x</span>
+        <span style="font-family:'Share Tech Mono',monospace; font-size:12px; color:var(--dim); margin-left:12px;">Empty — your wallet is clean and fully yours.</span>
+      </div>
+    </div>
+
+    <!-- How the Scanner Works -->
+    <div class="section-label">// How this scanner works</div>
+    <div class="scanner-flow">
+      <div class="scanner-step-card">
+        <div class="ssc-num">STEP 01</div>
+        <div class="ssc-title">Paste your wallet address</div>
+        <div class="ssc-body">Just your public wallet address — the one that starts with 0x. We never ask for your password, seed phrase, or private key. Ever.</div>
+      </div>
+      <div class="scanner-step-card">
+        <div class="ssc-num">STEP 02</div>
+        <div class="ssc-title">We check the blockchain</div>
+        <div class="ssc-body">Your browser quietly checks the Ethereum network to see if your wallet has any hidden code attached to it. Think of it like an X-ray scan for your wallet.</div>
+      </div>
+      <div class="scanner-step-card">
+        <div class="ssc-num">STEP 03</div>
+        <div class="ssc-title">We look for the scammer's fingerprint</div>
+        <div class="ssc-body">Every delegated wallet has a specific pattern left behind — like a scammer's signature. We scan for exactly that pattern and nothing else.</div>
+      </div>
+      <div class="scanner-step-card">
+        <div class="ssc-num">STEP 04</div>
+        <div class="ssc-title">You get a clear result</div>
+        <div class="ssc-body">Green means your wallet is clean and safe. Red means it's been compromised — and we'll show you exactly who controls it so you can take action.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Emergency -->
+  <div class="section-label">// My wallet is compromised — what do I do right now?</div>
+  <div class="emergency" style="flex-direction: column; align-items: stretch; gap: 0;">
+    <div style="font-size:15px; color:var(--danger); font-weight:700; margin-bottom:16px;">🚨 Stop everything first</div>
+    <div style="font-size:14px; color:var(--text); margin-bottom:20px; line-height:1.7;">
+      Do <strong style="color:var(--danger)">NOT</strong> send any tokens. Do <strong style="color:var(--danger)">NOT</strong> approve any transactions. Do <strong style="color:var(--danger)">NOT</strong> connect to any site. Close all browser tabs. Then work through the steps below.
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:12px;">
+
+      <div style="background:rgba(0,255,136,0.05); border:1px solid rgba(0,255,136,0.2); border-radius:8px; padding:16px;">
+        <div style="font-family:'Share Tech Mono',monospace; font-size:11px; color:var(--safe); letter-spacing:2px; margin-bottom:8px;">STEP 1 — DO THIS YOURSELF</div>
+        <div style="font-size:14px; color:var(--text); line-height:1.7;">
+          Open <strong style="color:var(--accent)">Ambire Wallet</strong> (ambire.com) or <strong style="color:var(--accent)">Frame Wallet</strong> (frame.sh) — both are free. Look for a "Delegation" or "Account" settings section and select <em>Clear Delegation</em> or <em>Revoke</em>. This works for most people without needing any outside help.
+        </div>
+      </div>
+
+      <div style="background:rgba(255,165,0,0.05); border:1px solid rgba(255,165,0,0.2); border-radius:8px; padding:16px;">
+        <div style="font-family:'Share Tech Mono',monospace; font-size:11px; color:var(--warn); letter-spacing:2px; margin-bottom:8px;">STEP 2 — PROTECT WHAT'S LEFT</div>
+        <div style="font-size:14px; color:var(--text); line-height:1.7;">
+          If you can't clear it yourself, don't waste time — <strong style="color:var(--warn)">create a brand new wallet immediately</strong> using MetaMask or Trust Wallet. Write down the new seed phrase on paper, keep it offline. Then move any remaining tokens to that new wallet. Never go back to the compromised one.
+        </div>
+      </div>
+
+      <div style="background:rgba(255,45,85,0.05); border:1px solid rgba(255,45,85,0.2); border-radius:8px; padding:16px;">
+        <div style="font-family:'Share Tech Mono',monospace; font-size:11px; color:var(--danger); letter-spacing:2px; margin-bottom:8px;">⚠ IMPORTANT WARNING</div>
+        <div style="font-size:14px; color:var(--text); line-height:1.7;">
+          <strong style="color:var(--danger)">Never accept help from strangers online</strong> — anyone who DMs you offering to "recover your wallet" or "reverse the hack" is a scammer running a second attack on you. No legitimate person will ever ask for your seed phrase, private key, or remote access to your device. If someone does — block them immediately.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="footer">
+    THIS TOOL ONLY READS YOUR PUBLIC WALLET ADDRESS — IT NEVER ASKS FOR YOUR SEED PHRASE OR PASSWORD<br>
+    NO DATA IS SAVED. NO TRACKING. RUNS ENTIRELY IN YOUR BROWSER.
+  </div>
+
+</div>
+
+<script>
+  let selectedRpc = 'https://eth.llamarpc.com';
+  let selectedChainName = 'ETH Mainnet';
+  let multiMode = false;
+
+  function selectChain(btn) {
+    document.querySelectorAll('.chain-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedRpc = btn.dataset.rpc;
+    selectedChainName = btn.dataset.name;
+  }
+
+  function toggleMulti() {
+    setTimeout(() => {
+      multiMode = document.getElementById('multiCheck').checked;
+      const mi = document.getElementById('multiInput');
+      const ai = document.getElementById('addressInput');
+      if (multiMode) {
+        mi.classList.add('visible');
+        ai.style.display = 'none';
+      } else {
+        mi.classList.remove('visible');
+        ai.style.display = '';
+      }
+      clearResults();
+    }, 10);
+  }
+
+  function clearResults() {
+    document.getElementById('resultsArea').innerHTML = '';
+    document.getElementById('summaryBar').classList.remove('visible');
+  }
+
+  async function getCode(address, rpc) {
+    const res = await fetch(rpc, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'eth_getCode',
+        params: [address, 'latest'],
+        id: 1
+      })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+    return data.result;
+  }
+
+  function isDelegated(code) {
+    return code && code.toLowerCase().startsWith('0xef0100');
+  }
+
+  function getDelegateAddress(code) {
+    // 0xef0100 is 3 bytes = 6 hex chars after 0x
+    // So delegate address starts at index 8 (0x + ef0100 = 8 chars)
+    if (code.length >= 50) {
+      return '0x' + code.slice(8, 48);
+    }
+    return 'unknown';
+  }
+
+  function isValidAddress(addr) {
+    return /^0x[0-9a-fA-F]{40}$/.test(addr.trim());
+  }
+
+  function shortenAddr(addr) {
+    return addr.slice(0, 8) + '...' + addr.slice(-6);
+  }
+
+  function createLoadingCard(address) {
+    const card = document.createElement('div');
+    card.className = 'result-card loading';
+    card.id = 'card-' + address;
+    card.innerHTML = `
+      <div class="result-header">
+        <span class="status-icon">⏳</span>
+        <span class="result-address">${address}</span>
+      </div>
+      <div style="padding-left: 34px;">
+        <div class="scanning-bar"></div>
+        <div class="scanning-text" style="margin-top:8px;">SCANNING ${selectedChainName}...</div>
+      </div>
+    `;
+    return card;
+  }
+
+  function updateCard(address, code) {
+    const card = document.getElementById('card-' + address);
+    if (!card) return;
+
+    const delegated = isDelegated(code);
+    card.className = 'result-card ' + (delegated ? 'delegated' : 'safe');
+
+    const etherscanBase = getEtherscanBase();
+    const delegateAddr = delegated ? getDelegateAddress(code) : null;
+
+    card.innerHTML = `
+      <div class="result-header">
+        <span class="status-icon">${delegated ? '🔴' : '🟢'}</span>
+        <span class="result-address">${address}</span>
+        <span class="result-badge ${delegated ? 'badge-danger' : 'badge-safe'}">${delegated ? 'DELEGATED' : 'SAFE'}</span>
+      </div>
+      <div class="result-detail">
+        ${delegated ? `
+          <div class="detail-label">Delegated to contract</div>
+          <div class="delegate-addr">${delegateAddr}</div>
+          <div style="font-size:13px; color:var(--dim); margin-bottom:8px;">
+            Your wallet is currently executing code from this contract. 
+            <strong style="color:var(--danger)">Do not transact until resolved.</strong>
+          </div>
+          <div class="action-links">
+            <a class="action-link" href="${etherscanBase}/address/${address}#code" target="_blank">View on Explorer ↗</a>
+            <a class="action-link" href="${etherscanBase}/address/${delegateAddr}" target="_blank">Inspect Contract ↗</a>
+            <a class="action-link" href="https://t.me/seal_911" target="_blank">Contact SEAL 911</a>
+          </div>
+        ` : `
+          <div style="color:var(--safe); font-size:13px;">
+            No delegation detected on ${selectedChainName}. This wallet returns empty bytecode — it is a normal EOA.
+          </div>
+          <div class="action-links">
+            <a class="action-link neutral" href="${etherscanBase}/address/${address}" target="_blank">View on Explorer ↗</a>
+          </div>
+        `}
+      </div>
+    `;
+  }
+
+  function showErrorCard(address, message) {
+    const card = document.getElementById('card-' + address);
+    if (!card) return;
+    card.className = 'result-card error';
+    card.innerHTML = `
+      <div class="result-header">
+        <span class="status-icon">⚠️</span>
+        <span class="result-address">${address}</span>
+        <span class="result-badge badge-warn">ERROR</span>
+      </div>
+      <div class="result-detail" style="color: var(--warn); font-size: 13px;">
+        ${message}
+      </div>
+    `;
+  }
+
+  function getEtherscanBase() {
+    if (selectedRpc.includes('base')) return 'https://basescan.org';
+    if (selectedRpc.includes('arbitrum')) return 'https://arbiscan.io';
+    if (selectedRpc.includes('optimism')) return 'https://optimistic.etherscan.io';
+    return 'https://etherscan.io';
+  }
+
+  async function runScan() {
+    const btn = document.getElementById('scanBtn');
+    const resultsArea = document.getElementById('resultsArea');
+    const summaryBar = document.getElementById('summaryBar');
+
+    let addresses = [];
+
+    if (multiMode) {
+      const raw = document.getElementById('multiAddresses').value.trim();
+      if (!raw) return;
+      addresses = raw.split('\n').map(a => a.trim()).filter(Boolean).slice(0, 10);
+    } else {
+      const raw = document.getElementById('addressInput').value.trim();
+      if (!raw) return;
+      addresses = [raw];
+    }
+
+    // Validate
+    const invalid = addresses.filter(a => !isValidAddress(a));
+    if (invalid.length > 0) {
+      resultsArea.innerHTML = '';
+      const errCard = document.createElement('div');
+      errCard.className = 'result-card error';
+      errCard.innerHTML = `
+        <div class="result-header">
+          <span class="status-icon">⚠️</span>
+          <span class="result-badge badge-warn">INVALID</span>
+        </div>
+        <div class="result-detail" style="color:var(--warn); font-size:13px;">
+          Invalid address format: ${invalid.map(a => `<code>${a}</code>`).join(', ')}<br>
+          Addresses must be 42-character hex strings starting with 0x.
+        </div>
+      `;
+      resultsArea.appendChild(errCard);
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'SCANNING...';
+    resultsArea.innerHTML = '';
+    summaryBar.classList.remove('visible');
+
+    // Create loading cards
+    for (const addr of addresses) {
+      resultsArea.appendChild(createLoadingCard(addr));
+    }
+
+    // Scan
+    let safeCount = 0, dangerCount = 0, errorCount = 0;
+
+    const tasks = addresses.map(async (addr) => {
+      try {
+        const code = await getCode(addr, selectedRpc);
+        updateCard(addr, code);
+        if (isDelegated(code)) dangerCount++;
+        else safeCount++;
+      } catch (err) {
+        showErrorCard(addr, `RPC error: ${err.message || 'Could not fetch code. Try a different network.'}`);
+        errorCount++;
+      }
+    });
+
+    await Promise.all(tasks);
+
+    // Show summary if multi
+    if (addresses.length > 1) {
+      document.getElementById('statTotal').textContent = addresses.length;
+      document.getElementById('statSafe').textContent = safeCount;
+      document.getElementById('statDanger').textContent = dangerCount;
+      document.getElementById('statError').textContent = errorCount;
+      summaryBar.classList.add('visible');
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'SCAN';
+  }
+
+  // Enter key support
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') runScan();
+  });
+</script>
+</body>
+</html>
